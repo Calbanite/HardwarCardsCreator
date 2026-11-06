@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hardwar Custom Element Cards</title>
+<style>
+  :root{
+    --ink:#14181c;
+    --line:#2a3138;
+    --muted:#8a949e;
+    --paper:#ffffff;
+    --panel:#eef1f3;
+    --accent:#1c6ea4;
+    --grid:#f4f6f7;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    background:#3a4149;
+    color:var(--ink);
+  }
+
+  /* ---------- App chrome (hidden on print) ---------- */
+  .app-bar{
+    background:#20262c;color:#e8edf1;
+    padding:14px 22px;display:flex;align-items:center;gap:20px;
+    flex-wrap:wrap;position:sticky;top:0;z-index:20;
+    border-bottom:2px solid #0d1114;
+  }
+  .app-bar h1{
+    font-size:18px;letter-spacing:.14em;text-transform:uppercase;
+    font-weight:700;margin:0;
+  }
+  .app-bar .spacer{flex:1;}
+  .btn{
+    background:#2f3941;color:#e8edf1;border:1px solid #46525c;
+    padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;
+    letter-spacing:.03em;transition:background .12s,border-color .12s;
+  }
+  .btn:hover{background:#3b4650;border-color:#5c6b77;}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.primary:hover{background:#2481be;}
+  .hint{color:#9fb0bd;font-size:12.5px;}
+
+  /* mode segmented control */
+  .mode-switch{display:flex;background:#161b20;border:1px solid #46525c;border-radius:7px;overflow:hidden;}
+  .mode-switch .seg{
+    background:transparent;color:#9fb0bd;border:none;cursor:pointer;
+    padding:7px 16px;font-size:13px;letter-spacing:.05em;font-weight:600;
+  }
+  .mode-switch .seg.on{background:var(--accent);color:#fff;}
+  /* reset button only matters in play mode */
+  body:not(.play-mode) #resetBtn{display:none;}
+  body.play-mode #addBtn{display:none;}
+
+  /* saved-list controls */
+  .list-controls{display:flex;gap:6px;align-items:center;}
+  #listSelect{
+    background:#2f3941;color:#e8edf1;border:1px solid #46525c;border-radius:6px;
+    padding:7px 9px;font-size:13px;max-width:180px;cursor:pointer;
+  }
+  #listSelect:focus{outline:none;border-color:var(--accent);}
+
+  /* toast notice */
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:#161b20;color:#e8edf1;border:1px solid #46525c;
+    padding:11px 18px;border-radius:8px;font-size:13.5px;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .2s;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .stage{padding:26px;}
+  /* card grid on screen: 2 across */
+  .sheet{
+    display:grid;grid-template-columns:repeat(2, 1fr);gap:20px;
+    max-width:1120px;margin:0 auto;
+  }
+
+  /* ---------- Card ---------- */
+  .card{
+    position:relative;background:var(--paper);
+    border:1.5px solid var(--line);border-radius:14px;
+    padding:16px 18px 14px;
+    box-shadow:0 4px 14px rgba(0,0,0,.25);
+    display:flex;flex-direction:column;gap:10px;
+    min-height:340px;
+  }
+  .card .remove{
+    position:absolute;top:-10px;right:-10px;
+    width:26px;height:26px;border-radius:50%;
+    background:#c0392b;color:#fff;border:2px solid #fff;
+    cursor:pointer;font-size:15px;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.3);
+  }
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .designation input{
+    font-size:16px;font-weight:700;letter-spacing:.04em;
+    border:none;border-bottom:1.5px solid #cfd6db;
+    padding:2px 2px 4px;width:200px;background:transparent;color:var(--ink);
+    text-transform:uppercase;
+  }
+  .designation input:focus{outline:none;border-bottom-color:var(--accent);}
+  .designation .lbl{font-size:9px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:1px;}
+
+  /* Custom badge-toggle under the unit name */
+  .custom-toggle{
+    display:inline-block;margin-top:6px;
+    font-size:9.5px;font-weight:800;letter-spacing:.16em;
+    padding:3px 9px;border-radius:4px;cursor:pointer;
+    border:1.3px solid #cfd6db;background:#fff;color:#9aa4ad;
+    transition:all .1s;
+  }
+  .custom-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  .custom-toggle.on{
+    background:var(--accent);border-color:var(--accent);color:#fff;
+  }
+  body.play-mode .custom-toggle{pointer-events:none;}
+
+  /* classification flag checkboxes */
+  .flags{display:flex;flex-wrap:wrap;gap:6px 14px;margin:2px 0 2px;}
+  .flag{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+    font-size:10.5px;letter-spacing:.04em;color:#6a7580;}
+  .flag-box{
+    width:14px;height:14px;border:1.4px solid var(--line);border-radius:3px;
+    background:#fff;flex:0 0 auto;position:relative;
+  }
+  .flag.on .flag-box{background:var(--ink);border-color:var(--ink);}
+  .flag.on .flag-box::after{
+    content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+    border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);
+  }
+  .flag.on .flag-label{color:var(--ink);font-weight:600;}
+  body.play-mode .flag{pointer-events:none;}
+
+  .type-box{text-align:center;}
+  .type-box .lbl{font-size:8.5px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;}
+  .class-wrap{display:flex;align-items:center;gap:4px;justify-content:center;margin-top:2px;}
+  .class-wrap .c{font-size:22px;font-weight:800;}
+  .class-dots{display:flex;gap:3px;}
+  .class-dots .cd{
+    width:11px;height:11px;border:1.4px solid var(--line);
+    transform:rotate(45deg);cursor:pointer;background:#fff;
+  }
+  .class-dots .cd.on{background:var(--ink);}
+
+  /* stat rows */
+  .stats{display:flex;flex-direction:column;gap:7px;margin-top:2px;}
+  .stat{display:flex;align-items:center;gap:9px;}
+  .stat .key{
+    font-size:19px;font-weight:800;width:20px;text-align:center;
+  }
+  /* zero toggle: tiny button to set a stat to 0 */
+  .zero-btn{
+    width:17px;height:17px;border-radius:4px;border:1.3px solid #cfd6db;
+    background:#fff;color:#8a949e;font-size:11px;font-weight:700;line-height:1;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    flex:0 0 auto;transition:all .1s;
+  }
+  .zero-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .zero-btn.on{background:#14181c;border-color:#14181c;color:#fff;}
+  body.play-mode .zero-btn{display:none;}
+  /* the single X circle shown when a stat is zero */
+  .pip.zero{
+    position:relative;border-color:var(--line);background:#fff;cursor:pointer;
+    box-shadow:none;
+  }
+  .pip.zero::before,.pip.zero::after{
+    content:"";position:absolute;left:50%;top:50%;width:11px;height:2px;
+    background:var(--ink);border-radius:1px;
+  }
+  .pip.zero::before{transform:translate(-50%,-50%) rotate(45deg);}
+  .pip.zero::after{transform:translate(-50%,-50%) rotate(-45deg);}
+  .pips{display:flex;gap:5px;}
+  .pip{
+    width:19px;height:19px;border-radius:50%;
+    border:1.6px solid var(--line);background:#fff;cursor:pointer;
+    transition:background .08s,border-color .08s;
+  }
+  /* "on" = a real circle that belongs on the card. Empty by design —
+     players mark these off in game. A subtle screen tint shows it's included. */
+  .pip.on{background:#fff;border-color:var(--line);box-shadow:inset 0 0 0 1px rgba(28,110,164,.18);}
+  /* "ghost" = builder-only slots for extending the count; never printed */
+  .pip.ghost{border-style:dashed;border-color:#cfd6db;opacity:.55;background:transparent;}
+  .pip:hover{border-color:var(--accent);opacity:1;}
+
+  /* ---------- Play mode ---------- */
+  body.play-mode .pip.ghost{display:none;}       /* only real circles show */
+  body.play-mode .card .remove{display:none;}     /* no deleting mid-game */
+  /* a circle marked off as damage */
+  body.play-mode .pip.hit{
+    background:#c0392b;border-color:#8c271b;
+    box-shadow:none;position:relative;
+  }
+  body.play-mode .pip.hit::after{
+    content:"";position:absolute;inset:3px;border-radius:50%;
+    background:#fff;opacity:.0;
+  }
+  /* total-damage box marked off */
+  body.play-mode .total .tb.hit{background:#c0392b;border-color:#8c271b;}
+  body.play-mode .total .tb{cursor:pointer;}
+  /* lock text fields while playing */
+  body.play-mode .designation input,
+  body.play-mode .rules textarea,
+  body.play-mode .rules .num input{pointer-events:none;}
+  body.play-mode .class-dots .cd{pointer-events:none;cursor:default;}
+  /* damage readout chip */
+  .dmg-readout{
+    font-size:10px;color:var(--muted);letter-spacing:.04em;
+    margin-left:6px;white-space:nowrap;
+  }
+  body:not(.play-mode) .dmg-readout{display:none;}
+
+  .total{
+    display:flex;align-items:center;gap:8px;margin-top:4px;
+    font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  }
+  .total .boxes{display:flex;gap:3px;flex:1;}
+  .total .tb{flex:1;height:15px;border:1.3px solid var(--line);border-radius:2px;background:#fff;}
+
+  .rules{display:flex;gap:8px;margin-top:auto;}
+  .rules textarea{
+    flex:1;resize:none;border:1.4px solid var(--line);border-radius:8px;
+    padding:8px 10px;font-size:12px;font-family:inherit;min-height:64px;color:var(--ink);
+    line-height:1.35;
+  }
+  .rules textarea:focus{outline:none;border-color:var(--accent);}
+  .rules .num{
+    width:56px;border:1.4px solid var(--line);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .rules .num input{
+    width:100%;height:100%;border:none;text-align:center;font-size:22px;
+    font-weight:700;background:transparent;color:var(--ink);
+  }
+  .rules .num input:focus{outline:none;}
+
+  /* add-card tile */
+  .add-tile{
+    border:2.5px dashed #6a7680;border-radius:14px;
+    display:flex;align-items:center;justify-content:center;
+    color:#c3ccd3;font-size:15px;cursor:pointer;min-height:340px;
+    background:rgba(255,255,255,.04);letter-spacing:.05em;
+  }
+  .add-tile:hover{border-color:var(--accent);color:#dfe7ec;}
+
+  /* ---------- Print ---------- */
+  @media print{
+    @page{size:letter;margin:0.4in;}
+    body{background:#fff;}
+    .app-bar,.add-tile,.card .remove,.toast{display:none !important;}
+    .stage{padding:0;}
+    .sheet{gap:0.18in;max-width:none;}
+    .card{
+      box-shadow:none;break-inside:avoid;page-break-inside:avoid;
+      border-color:#000;min-height:3.1in;
+    }
+    /* real circles always print as empty outlines — even damage marked in
+       play mode — so a printed card is a fresh blank to mark off by hand */
+    .pip.on,.pip.hit{background:#fff !important;border-color:#000 !important;box-shadow:none !important;}
+    .pip.hit::after{display:none !important;}
+    /* zeroed stat prints as a crossed-out circle */
+    .pip.zero{border-color:#000 !important;}
+    .pip.zero::before,.pip.zero::after{background:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .zero-btn{display:none !important;}
+    .total .tb.hit{background:#fff !important;border-color:#000 !important;}
+    .dmg-readout{display:none !important;}
+    /* builder-only slots don't print */
+    .pip.ghost{display:none !important;}
+    /* class diamonds stay filled to indicate the fixed class value */
+    .class-dots .cd.on{background:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .designation input{border-bottom-color:#999;}
+    /* custom badge + flags print in black ink */
+    .custom-toggle{
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;
+      border-color:#000 !important;
+    }
+    .custom-toggle.on{background:#000 !important;color:#fff !important;border-color:#000 !important;}
+    .flag-box{border-color:#000 !important;}
+    .flag.on .flag-box{background:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .flag.on .flag-label,.flag-label{color:#000 !important;}
+  }
+</style>
+</head>
+<body>
+<div class="app-bar">
+  <h1>Hardwar Element Cards</h1>
+  <div class="mode-switch" id="modeSwitch">
+    <button class="seg on" data-mode="build">Build</button>
+    <button class="seg" data-mode="play">Play</button>
+  </div>
+  <span class="hint" id="hint"></span>
+  <span class="spacer"></span>
+  <div class="list-controls">
+    <select id="listSelect" title="Saved lists"><option value="">— Saved lists —</option></select>
+    <button class="btn" id="loadBtn">Load</button>
+    <button class="btn" id="saveBtn">Save list</button>
+    <button class="btn" id="delBtn" title="Delete selected list">Delete</button>
+  </div>
+  <button class="btn" id="resetBtn">Reset damage</button>
+  <button class="btn" id="addBtn">+ Add card</button>
+  <button class="btn primary" id="printBtn">Print / Save PDF</button>
+</div>
+<div id="toast" class="toast"></div>
+
+<div class="stage">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+const STATS = [
+  {key:"M", name:"Movement"},
+  {key:"F", name:"Firepower"},
+  {key:"A", name:"Armor"},
+  {key:"D", name:"Defense"},
+];
+const MAX_PIPS = 8;
+const MAX_CLASS = 5;
+const TOTAL_BOXES = 12;
+
+let cards = [];
+let idc = 0;
+
+function newCard(){
+  return {
+    id: ++idc,
+    name: "",
+    cls: 1,
+    stats: {M:1, F:1, A:1, D:1},
+    rules: "",
+    num: "",
+    // classification flags
+    custom: false,
+    flags: {experimental:false, fieldUpgrade:false, perfUpgrade:false},
+    // play-mode damage: how many pips marked off per stat, + total boxes
+    dmg: {M:0, F:0, A:0, D:0},
+    totalDmg: 0
+  };
+}
+
+const FLAGS = [
+  {key:"experimental", label:"Experimental"},
+  {key:"fieldUpgrade",  label:"Field Upgrade"},
+  {key:"perfUpgrade",   label:"Performance Upgrade"},
+];
+
+let mode = "build"; // "build" | "play"
+
+const HINTS = {
+  build: "Click a circle to set how many each stat has · dashed circles add more · they print empty to mark off in game",
+  play:  "Click stat circles or damage boxes to mark hits · click a marked one to clear · printing always gives blank cards"
+};
+
+function render(){
+  document.body.classList.toggle("play-mode", mode==="play");
+  document.getElementById("hint").textContent = HINTS[mode];
+  document.querySelectorAll("#modeSwitch .seg").forEach(b=>{
+    b.classList.toggle("on", b.dataset.mode===mode);
+  });
+
+  const sheet = document.getElementById("sheet");
+  sheet.replaceChildren();
+  cards.forEach(card => sheet.appendChild(cardEl(card)));
+
+  if(mode==="build"){
+    const add = document.createElement("div");
+    add.className = "add-tile";
+    add.textContent = "+ Add another card";
+    add.onclick = () => { cards.push(newCard()); render(); };
+    sheet.appendChild(add);
+  }
+}
+
+function cardEl(card){
+  const el = document.createElement("div");
+  el.className = "card";
+
+  // remove
+  const rm = document.createElement("button");
+  rm.className = "remove"; rm.textContent = "×";
+  rm.title = "Remove card";
+  rm.onclick = () => { cards = cards.filter(c=>c.id!==card.id); render(); };
+  el.appendChild(rm);
+
+  // top: designation + type/class
+  const top = document.createElement("div");
+  top.className = "card-top";
+
+  const des = document.createElement("div");
+  des.className = "designation";
+  const desLbl = document.createElement("span");
+  desLbl.className = "lbl"; desLbl.textContent = "Designation";
+  des.appendChild(desLbl);
+  const nameIn = document.createElement("input");
+  nameIn.value = card.name; nameIn.placeholder = "Unit name";
+  nameIn.oninput = e => card.name = e.target.value;
+  des.appendChild(nameIn);
+
+  // Custom toggle — marks a unit as modified/scratch-built
+  const custom = document.createElement("button");
+  custom.className = "custom-toggle" + (card.custom ? " on":"");
+  custom.textContent = "CUSTOM";
+  custom.title = card.custom ? "Marked custom — click to clear" : "Mark this unit as custom / modified";
+  if(mode==="build"){
+    custom.onclick = () => { card.custom = !card.custom; render(); };
+  }
+  if(mode==="build" || card.custom) des.appendChild(custom);
+
+  top.appendChild(des);
+
+  const typeBox = document.createElement("div");
+  typeBox.className = "type-box";
+  const typeLbl = document.createElement("span");
+  typeLbl.className = "lbl"; typeLbl.textContent = "Type";
+  typeBox.appendChild(typeLbl);
+  const cw = document.createElement("div");
+  cw.className = "class-wrap";
+  const cLetter = document.createElement("span");
+  cLetter.className = "c"; cLetter.textContent = "C" + card.cls;
+  cw.appendChild(cLetter);
+  const dots = document.createElement("div");
+  dots.className = "class-dots";
+  for(let i=1;i<=MAX_CLASS;i++){
+    const d = document.createElement("div");
+    d.className = "cd" + (i<=card.cls ? " on":"");
+    d.title = "Class " + i;
+    d.onclick = () => { card.cls = (card.cls===i && i===1)?1:i; render(); };
+    dots.appendChild(d);
+  }
+  cw.appendChild(dots);
+  typeBox.appendChild(cw);
+  top.appendChild(typeBox);
+  el.appendChild(top);
+
+  // stats
+  const stats = document.createElement("div");
+  stats.className = "stats";
+  STATS.forEach(s => {
+    const row = document.createElement("div");
+    row.className = "stat";
+    const k = document.createElement("div");
+    k.className = "key"; k.textContent = s.key; k.title = s.name;
+    row.appendChild(k);
+
+    const count = card.stats[s.key];
+    const hits = card.dmg[s.key];
+    const isZero = count === 0;
+
+    // zero toggle (build mode only, hidden via CSS in play)
+    const z = document.createElement("button");
+    z.className = "zero-btn" + (isZero ? " on":"");
+    z.textContent = "0";
+    z.title = isZero ? `${s.name} is zero — click to restore` : `Set ${s.name} to zero`;
+    z.onclick = () => {
+      if(isZero){ card.stats[s.key] = 1; }
+      else { card.stats[s.key] = 0; card.dmg[s.key] = 0; }
+      render();
+    };
+    row.appendChild(z);
+
+    const pips = document.createElement("div");
+    pips.className = "pips";
+
+    if(isZero){
+      // single X circle representing a zeroed stat
+      const p = document.createElement("div");
+      p.className = "pip zero";
+      p.title = `${s.name}: 0`;
+      if(mode==="build"){
+        p.onclick = () => { card.stats[s.key] = 1; render(); };
+      }
+      pips.appendChild(p);
+    } else {
+      for(let i=1;i<=MAX_PIPS;i++){
+        const p = document.createElement("div");
+        const active = i<=count;
+        let cls = "pip" + (active ? " on":" ghost");
+        if(mode==="play" && active && i<=hits) cls += " hit";
+        p.className = cls;
+
+        if(mode==="play"){
+          p.title = active ? `${s.name} damage — click to mark/clear` : "";
+          if(active){
+            p.onclick = () => {
+              card.dmg[s.key] = (i===hits) ? i-1 : i;
+              render();
+            };
+          }
+        } else {
+          p.title = active ? `${s.name}: ${count}` : `Set ${s.name} to ${i}`;
+          p.onclick = () => {
+            const nv = (i===count && i>1) ? i-1 : i;
+            card.stats[s.key] = nv;
+            if(card.dmg[s.key] > nv) card.dmg[s.key] = nv;
+            render();
+          };
+        }
+        pips.appendChild(p);
+      }
+    }
+    row.appendChild(pips);
+
+    if(mode==="play"){
+      const ro = document.createElement("span");
+      ro.className = "dmg-readout";
+      ro.textContent = isZero ? "—" : `${count-hits}/${count}`;
+      ro.title = "remaining / total";
+      row.appendChild(ro);
+    }
+
+    stats.appendChild(row);
+  });
+  el.appendChild(stats);
+
+  // classification flags row
+  const flagRow = document.createElement("div");
+  flagRow.className = "flags";
+  FLAGS.forEach(f => {
+    const on = !!card.flags[f.key];
+    const item = document.createElement("label");
+    item.className = "flag" + (on ? " on":"");
+    const box = document.createElement("span");
+    box.className = "flag-box";
+    const txt = document.createElement("span");
+    txt.className = "flag-label"; txt.textContent = f.label;
+    item.appendChild(box); item.appendChild(txt);
+    if(mode==="build"){
+      item.onclick = () => { card.flags[f.key] = !card.flags[f.key]; render(); };
+    }
+    // in play mode, only show the ones that are checked
+    if(mode==="build" || on) flagRow.appendChild(item);
+  });
+  el.appendChild(flagRow);
+
+  // total damage track
+  const total = document.createElement("div");
+  total.className = "total";
+  const totalLbl = document.createElement("span");
+  totalLbl.textContent = "Total Damage";
+  total.appendChild(totalLbl);
+  const boxes = document.createElement("div");
+  boxes.className = "boxes";
+  for(let i=1;i<=TOTAL_BOXES;i++){
+    const b = document.createElement("div");
+    b.className = "tb" + (mode==="play" && i<=card.totalDmg ? " hit":"");
+    if(mode==="play"){
+      b.title = "Total damage — click to mark/clear";
+      b.onclick = () => {
+        card.totalDmg = (i===card.totalDmg) ? i-1 : i;
+        render();
+      };
+    }
+    boxes.appendChild(b);
+  }
+  total.appendChild(boxes);
+  el.appendChild(total);
+
+  // rules + number
+  const rules = document.createElement("div");
+  rules.className = "rules";
+  const ta = document.createElement("textarea");
+  ta.placeholder = "Special rules…"; ta.value = card.rules;
+  ta.oninput = e => card.rules = e.target.value;
+  rules.appendChild(ta);
+  const num = document.createElement("div");
+  num.className = "num";
+  const numIn = document.createElement("input");
+  numIn.value = card.num; numIn.placeholder="#";
+  numIn.oninput = e => card.num = e.target.value;
+  num.appendChild(numIn);
+  rules.appendChild(num);
+  el.appendChild(rules);
+
+  return el;
+}
+
+document.getElementById("addBtn").onclick = () => { cards.push(newCard()); render(); };
+document.getElementById("printBtn").onclick = () => window.print();
+
+// mode switch
+document.querySelectorAll("#modeSwitch .seg").forEach(b=>{
+  b.onclick = () => { mode = b.dataset.mode; render(); };
+});
+
+// reset all damage (play mode)
+document.getElementById("resetBtn").onclick = () => {
+  cards.forEach(c=>{ c.dmg={M:0,F:0,A:0,D:0}; c.totalDmg=0; });
+  render();
+};
+
+/* ---------- Saved lists (localStorage) ---------- */
+const STORE_KEY = "hardwar.lists.v1";
+const sel = document.getElementById("listSelect");
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+function loadStore(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+function saveStore(obj){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(obj));
+    return true;
+  }catch(e){ return false; }
+}
+function refreshSelect(selectName){
+  const store = loadStore();
+  const names = Object.keys(store).sort((a,b)=>a.localeCompare(b));
+  // Build options with DOM methods so list names are always treated as text,
+  // never parsed as HTML (prevents stored XSS from a crafted list name).
+  sel.textContent = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "— Saved lists —";
+  sel.appendChild(placeholder);
+  names.forEach(n=>{
+    const opt = document.createElement("option");
+    opt.value = n;              // .value assigns as text, no HTML parsing
+    opt.textContent = n;        // .textContent assigns as text, no HTML parsing
+    sel.appendChild(opt);
+  });
+  if(selectName && store[selectName]) sel.value = selectName;
+}
+
+// deep copy so saved snapshots don't alias live cards
+function snapshot(){
+  return JSON.parse(JSON.stringify(cards));
+}
+
+document.getElementById("saveBtn").onclick = () => {
+  const suggested = sel.value || "";
+  const name = (prompt("Save list as:", suggested) || "").trim();
+  if(!name) return;
+  const store = loadStore();
+  if(store[name] && !confirm(`"${name}" already exists. Overwrite it?`)) return;
+  store[name] = { savedAt: Date.now(), cards: snapshot() };
+  if(saveStore(store)){
+    refreshSelect(name);
+    toast(`Saved "${name}"`);
+  } else {
+    toast("Couldn't save — storage unavailable in this view.");
+  }
+};
+
+document.getElementById("loadBtn").onclick = () => {
+  const name = sel.value;
+  if(!name){ toast("Pick a saved list first."); return; }
+  const store = loadStore();
+  const entry = store[name];
+  if(!entry){ toast("That list is gone."); return; }
+  // rebuild cards, re-id to avoid collisions, backfill any missing fields
+  cards = entry.cards.map(c=>({
+    id: ++idc,
+    name: c.name||"",
+    cls: c.cls||1,
+    stats: Object.assign({M:1,F:1,A:1,D:1}, c.stats||{}),
+    rules: c.rules||"",
+    num: c.num||"",
+    custom: !!c.custom,
+    flags: Object.assign({experimental:false,fieldUpgrade:false,perfUpgrade:false}, c.flags||{}),
+    dmg: Object.assign({M:0,F:0,A:0,D:0}, c.dmg||{}),
+    totalDmg: c.totalDmg||0
+  }));
+  render();
+  toast(`Loaded "${name}" (${cards.length} card${cards.length!==1?"s":""})`);
+};
+
+document.getElementById("delBtn").onclick = () => {
+  const name = sel.value;
+  if(!name){ toast("Pick a saved list first."); return; }
+  if(!confirm(`Delete saved list "${name}"? This can't be undone.`)) return;
+  const store = loadStore();
+  delete store[name];
+  saveStore(store);
+  refreshSelect();
+  toast(`Deleted "${name}"`);
+};
+
+refreshSelect();
+
+// start with two cards
+cards.push(newCard(), newCard());
+render();
+</script>
+</body>
+</html>
